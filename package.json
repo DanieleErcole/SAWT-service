@@ -1,0 +1,9 @@
+{
+    "name": "sawt-service",
+    "version": "0.0.1",
+    "description": "video synchronization service for the SAWTogether website",
+    "type": "module",
+    "dependencies": {
+        "socket.io": "^4.1.2"
+    }
+  }
