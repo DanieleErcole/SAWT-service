@@ -4,6 +4,7 @@
     "description": "video synchronization service for the SAWTogether website",
     "type": "module",
     "dependencies": {
+        "mariadb": "^3.2.2",
         "socket.io": "^4.1.2"
     }
-  }
+}
