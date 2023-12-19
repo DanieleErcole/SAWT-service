@@ -13,13 +13,11 @@ export async function user(token) {
 }
 
 export async function user_by_id(io, id) {
-    return await io.fetchSockets().then((sockets) => {
-        sockets.forEach((s) => {
-            if(s.data.user.id == id)
-                return s.data.user;
-        });
-        return false;
-    });
+    let sockets = await io.fetchSockets();
+    for(s in sockets)
+        if(s.data.user.id == id)
+            return s.data.user;
+    return false;
 }
 
 export function check_token(socket, token) {
