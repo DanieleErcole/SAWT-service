@@ -1,6 +1,15 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
-import { check_token, user, room_users, disconnect_user, assign_leader, remove_leader, assign_leader_random } from "./db/user_functions"
+import { 
+    check_token, 
+    user, 
+    room_users, 
+    disconnect_user, 
+    assign_leader, 
+    remove_leader, 
+    get_leader, 
+    assign_leader_random 
+} from "./db/user_functions"
 
 const port = 3030;
 
@@ -30,9 +39,12 @@ io.on("connection", (socket) => {
     socket.on("disconnect", async (token) => {
         check_token(socket, token);
 
-        let room_id = socket.data.room_id;
+        let user = socket.data.user;
+        let room_id = socket.data.user.room_id;
         socket.data.user = null;
-        socket.leave(user.room_id);
+
+        socket.leave(room_id);
+        await disconnect_user(user);
 
         let room_usrs = await room_users(io, room_id);
         if(room_usrs.length == 0) return; // Se non ci sono più utenti nella stanza, non faccio niente
@@ -53,6 +65,7 @@ io.on("connection", (socket) => {
         let old_leader = socket.data.user;
         if(old_leader.id != await get_leader(room_id).id) return; // Qui qualcuno ha cercato di fare il furbo, gestire l'errore
 
+        await remove_leader(old_leader);
         let new_leader = await user_by_id(io, new_id);
         await assign_leader(new_leader);
 
