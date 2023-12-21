@@ -16,8 +16,6 @@ const port = 3030;
 const server = createServer();
 const io = new Server(server);
 
-//const usr_manager = new UserManager();
-
 // Authentication middleware
 // Controllo che l'utente sia autenticato correttamente e lo salvo nel socket, in caso si sia appena connesso lo cerco nel database e lo salvo
 io.use(async (socket, next) => {
@@ -82,6 +80,16 @@ io.on("connection", (socket) => {
     });
 
     // ---- Video events
+
+    socket.on("add", (url) => {
+        let user = socket.data.user;
+        // Aggiungere il video nel db
+    });
+
+    socket.on("remove", (id) => {
+        let user = socket.data.user;
+        // Rimuovere il video nel db
+    });
 
     socket.on("resume", () => {
         let room_id = socket.data.user.room_id;
