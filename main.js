@@ -8,7 +8,8 @@ import {
     assign_leader, 
     remove_leader, 
     get_leader, 
-    assign_leader_random 
+    assign_leader_random, 
+    user
 } from "./db/user_functions"
 
 const port = 3030;
@@ -18,16 +19,29 @@ const io = new Server(server);
 
 //const usr_manager = new UserManager();
 
+// Authentication middleware
+// Controllo che l'utente sia autenticato correttamente e lo salvo nel socket, in caso si sia appena connesso lo cerco nel database e lo salvo
+io.use(async (socket, next) => {
+    let token = socket.handshake.auth.token;
+    
+    if(socket.data.user === undefined) {
+        let user = await user(token);
+        if(!user) return next(new Error("Authentication error"));
+        socket.data.user = user;
+        return next();
+    }
+
+    if(socket.data.user.video_token !== token) 
+        return next(new Error("Authentication error"));
+    next();
+});
+
 io.on("connection", (socket) => {
 
     // ---- User events
 
-    socket.on("joined", async (token) => {
-        let user = await user(token);
-        // Controllo di user
-        if(!user) return; // Fare refactor e inviare al client un errore
-        socket.data.user = user;
-        
+    socket.on("joined", async () => {
+        let user = socket.data.user;        
         let room_id = user.room_id;
         socket.join(room_id);
 
@@ -36,9 +50,7 @@ io.on("connection", (socket) => {
         // Mando la coda di video all'utente appena collegato
     });
 
-    socket.on("disconnect", async (token) => {
-        check_token(socket, token);
-
+    socket.on("disconnect", async () => {
         let user = socket.data.user;
         let room_id = socket.data.user.room_id;
         socket.data.user = null;
@@ -57,10 +69,7 @@ io.on("connection", (socket) => {
         io.in(room_id).emit("update_user_list", users);
     });
 
-    socket.on("set_leader" , async (token, new_id) => {
-        check_token(socket, token);
-
-        // Solo chi è leader trasferire il proprio ruolo
+    socket.on("set_leader" , async (new_id) => {
         let room_id = socket.data.user.room_id;
         let old_leader = socket.data.user;
         if(old_leader.id != await get_leader(room_id).id) return; // Qui qualcuno ha cercato di fare il furbo, gestire l'errore
@@ -75,18 +84,18 @@ io.on("connection", (socket) => {
 
     // ---- Video events
 
-    socket.on("resume", async (token) => {
-        check_token(socket, token);
+    socket.on("resume", () => {
+        let room_id = socket.data.user.room_id;
         socket.broadcast.to(room_id).emit("resume");
     });
 
-    socket.on("pause", async (token) => {
-        check_token(socket, token);
+    socket.on("pause", () => {
+        let room_id = socket.data.user.room_id;
         socket.broadcast.to(room_id).emit("play");
     });
 
-    socket.on("seek", async (token, position) => {
-        check_token(socket, token);
+    socket.on("seek", (position) => {
+        let room_id = socket.data.user.room_id;
         socket.broadcast.to(room_id).emit("seek", position);
     });
 

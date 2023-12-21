@@ -20,10 +20,6 @@ export async function user_by_id(io, id) {
     return false;
 }
 
-export function check_token(socket, token) {
-    return socket.data.user.video_token === token;
-}
-
 export async function room_users(io, room_id) {
     let sockets = await io.in(room_id).fetchSockets();
     return sockets.map((s) => s.data.user);
