@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { 
-    user, 
     room_users, 
     disconnect_user, 
     assign_leader, 
@@ -9,7 +8,7 @@ import {
     get_leader, 
     assign_leader_random, 
     user
-} from "./db/user_functions"
+} from "./db/user_functions.js"
 
 const port = 3030;
 
@@ -111,5 +110,5 @@ io.on("connection", (socket) => {
 });
 
 server.listen(port, () => {
-    console.log("Server is running on port: ${port}");
+    console.log(`Server is running on port: ${port}`);
 });

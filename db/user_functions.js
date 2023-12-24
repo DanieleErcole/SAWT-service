@@ -1,4 +1,4 @@
-import { pool } from "./db_connection";
+import { pool } from "./db_connection.js";
 
 export async function user(token) {
     const res = await pool.execute(

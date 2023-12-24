@@ -1,6 +1,6 @@
-const mysql = require('mariadb');
+import mariadb from 'mariadb';
 
-export const pool = mysql.createPool({
+export const pool = mariadb.createPool({
     host: '0.0.0.0',
     user: 'root',
     password: 'admin',
