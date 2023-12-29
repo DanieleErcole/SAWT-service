@@ -5,21 +5,26 @@ import {
     disconnect_user,  
     get_leader, 
     assign_new_leader,
-    user
+    get_user
 } from "./db/user_functions.js"
 
 const port = 3030;
 
 const server = createServer();
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: 'http://localhost'
+    }
+});
 
 // Authentication middleware
 // Checks if the user is authenticated and saves it in the socket, if it has just connected it searches for it in the db and caches it in the socket data
 io.use(async (socket, next) => {
+    console.log("Executed");
     let token = socket.handshake.auth.token;
     
     if(socket.data.user === undefined) {
-        let user = await user(token);
+        let user = await get_user(token);
         if(!user) return next(new Error("Authentication error"));
         socket.data.user = user;
         return next();
@@ -35,6 +40,7 @@ io.on("connection", (socket) => {
     // ---- User events
 
     socket.on("joined", async () => {
+        console.log("User joined");
         let user = socket.data.user;        
         let room_id = user.room_id;
         socket.join(room_id);
@@ -45,6 +51,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", async () => {
+        console.log("User disconnected");
         let user = socket.data.user;
         let room_id = socket.data.user.room_id;
         socket.data.user = null;

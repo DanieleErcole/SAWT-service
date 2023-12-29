@@ -1,19 +1,21 @@
 import mariadb from 'mariadb';
 
 export const pool = mariadb.createPool({
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     user: 'root',
-    password: 'admin',
+    password: '',
     database: 'test'
 });
 
 export async function query(query, params = []) {
+    let conn = await pool.getConnection();
+    let res = false;
     try {
-        let conn = await pool.getConnection();
-        return await conn.execute(query, params);
+        res = await conn.execute(query, params);
     } finally {
         await conn.release();
     }
+    return res;
 }
 
 export async function get_conn() {
