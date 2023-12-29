@@ -1,7 +1,10 @@
-import { pool } from "./db_connection.js";
+import { query, get_conn } from "./db_connection.js";
+
+// NOTE: If something in the db fails, like the assigment of a new leader aftre the disconnection of the previous one, the user will be disconnected anyway,
+//      but the room will be left in an inconsistent state, with no leader. Handle the error, like notifying the users or disconnecting them
 
 export async function user(token) {
-    const res = await pool.execute(
+    const res = await query(
         'SELECT id, firstname, lastname, room_id, is_leader, video_token FROM users WHERE video_token = ?',
         [token]
     );
@@ -22,7 +25,18 @@ export async function user_by_id(io, id) {
 
 export async function room_users(io, room_id) {
     let sockets = await io.in(room_id).fetchSockets();
-    return sockets.map((s) => s.data.user);
+
+    let users = [];
+    for(s in sockets) {
+        users.push({
+            id: s.data.user.id,
+            firstname: s.data.user.firstname,
+            lastname: s.data.user.lastname,
+            is_leader: s.data.user.is_leader
+        });
+    }
+
+    return users;
 }
 
 export async function get_leader(io, room_id) {
@@ -34,31 +48,53 @@ export async function get_leader(io, room_id) {
 }
 
 export async function disconnect_user(user) {
-    return await pool.execute(
-        'UPDATE users SET video_token = NULL, room_id = NULL, is_leader = NULL WHERE id = ?',
-        [user.id]
-    );
+    try {
+        return await query(
+            'UPDATE users SET video_token = NULL, room_id = NULL, is_leader = NULL WHERE id = ?',
+            [user.id]
+        );
+    } catch(err) {
+        return false;
+    }
 }
 
-export async function assign_leader_random(io, room_id) {
+async function get_leader_random(io, room_id) {
     let users = await room_users(io, room_id);
     let new_leader = users[Math.floor(Math.random() * users.length)];
 
-    return await assign_leader(new_leader);
+    return new_leader;
 }
 
-export async function remove_leader(old_leader) {
-    old_leader.is_leader = false;
-    await pool.execute(
-        'UPDATE users SET is_leader = FALSE WHERE id = ?',
-        [old_leader.id]
-    );
-}
+export async function assign_new_leader(io, old_leader, new_leader = false) {
+    let room_id = old_leader.room_id;
+    let res = true;
 
-export async function assign_leader(new_leader) {
-    new_leader.is_leader = true;
-    await pool.execute(
-        'UPDATE users SET is_leader = TRUE WHERE id = ?',
-        [new_leader.id]
-    );
+    try {
+        let conn = await get_conn();
+        await conn.beginTransaction();
+        await conn.execute(
+            'UPDATE users SET is_leader = FALSE WHERE id = ?',
+            [old_leader.id]
+        );
+
+        if(!new_leader)
+            new_leader = await get_leader_random(io, room_id);
+
+        await conn.execute(
+            'UPDATE users SET is_leader = TRUE WHERE id = ?',
+            [new_leader.id]
+        );
+        await conn.commit();
+    } catch(err) {
+        await conn.rollback();
+        res = false;
+    } finally {
+        await conn.release();
+    }
+
+    if(res) {
+        old_leader.is_leader = false;
+        new_leader.is_leader = true;
+    }
+    return res;
 }

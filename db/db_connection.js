@@ -4,12 +4,19 @@ export const pool = mariadb.createPool({
     host: '0.0.0.0',
     user: 'root',
     password: 'admin',
-    database: 'test',
-    waitForConnections: true,
-    connectionLimit: 10,
-    maxIdle: 10, // max idle connections, the default value is the same as `connectionLimit`
-    idleTimeout: 60000, // idle connections timeout, in milliseconds, the default value 60000
-    queueLimit: 0,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    database: 'test'
 });
+
+export async function query(query, params = []) {
+    try {
+        let conn = await pool.getConnection();
+        return await conn.execute(query, params);
+    } finally {
+        await conn.release();
+    }
+}
+
+export async function get_conn() {
+    return await pool.getConnection();
+}
+

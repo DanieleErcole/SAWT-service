@@ -2,11 +2,9 @@ import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { 
     room_users, 
-    disconnect_user, 
-    assign_leader, 
-    remove_leader, 
+    disconnect_user,  
     get_leader, 
-    assign_leader_random, 
+    assign_new_leader,
     user
 } from "./db/user_functions.js"
 
@@ -16,7 +14,7 @@ const server = createServer();
 const io = new Server(server);
 
 // Authentication middleware
-// Controllo che l'utente sia autenticato correttamente e lo salvo nel socket, in caso si sia appena connesso lo cerco nel database e lo salvo
+// Checks if the user is authenticated and saves it in the socket, if it has just connected it searches for it in the db and caches it in the socket data
 io.use(async (socket, next) => {
     let token = socket.handshake.auth.token;
     
@@ -43,7 +41,7 @@ io.on("connection", (socket) => {
 
         let users = await room_users(io, room_id);
         io.in(room_id).emit("update_user_list", users);
-        // Mando la coda di video all'utente appena collegato
+        // Send the video queue to the new user
     });
 
     socket.on("disconnect", async () => {
@@ -55,26 +53,27 @@ io.on("connection", (socket) => {
         await disconnect_user(user);
 
         let room_usrs = await room_users(io, room_id);
-        if(room_usrs.length == 0) return; // Se non ci sono più utenti nella stanza, non faccio niente
+        if(room_usrs.length == 0) return; // The room is empty, I don't need to do anything
 
-        let leader = await get_leader(room_id); 
-        if(!leader)
-            assign_leader_random(room_id);
+        let leader = await get_leader(io, room_id);
+        if(!leader) {
+            // Assign a new random leader if the previous one left
+            if(!await assign_new_leader(io, user)) return;
+        }
 
-        let users = await room_users(room_id);
+        let users = await room_users(io, room_id);
         io.in(room_id).emit("update_user_list", users);
     });
 
     socket.on("set_leader" , async (new_id) => {
         let room_id = socket.data.user.room_id;
         let old_leader = socket.data.user;
-        if(old_leader.id != await get_leader(room_id).id) return; // Qui qualcuno ha cercato di fare il furbo, gestire l'errore
+        if(!old_leader.is_leader) return; // Here someone tried to impersonate the old leader, handle this case
 
-        await remove_leader(old_leader);
         let new_leader = await user_by_id(io, new_id);
-        await assign_leader(new_leader);
+        await assign_new_leader(io, old_leader, new_leader);
 
-        const users = await room_users(room_id);
+        const users = await room_users(io, room_id);
         io.in(room_id).emit("update_user_list", users);
     });
 
@@ -91,16 +90,19 @@ io.on("connection", (socket) => {
     });
 
     socket.on("resume", () => {
+        if (!socket.data.user.is_leader) return;
         let room_id = socket.data.user.room_id;
         socket.broadcast.to(room_id).emit("resume");
     });
 
     socket.on("pause", () => {
+        if (!socket.data.user.is_leader) return;
         let room_id = socket.data.user.room_id;
         socket.broadcast.to(room_id).emit("play");
     });
 
     socket.on("seek", (position) => {
+        if (!socket.data.user.is_leader) return;
         let room_id = socket.data.user.room_id;
         socket.broadcast.to(room_id).emit("seek", position);
     });
