@@ -20,10 +20,9 @@ const io = new Server(server, {
 // Authentication middleware
 // Checks if the user is authenticated and saves it in the socket, if it has just connected it searches for it in the db and caches it in the socket data
 io.use(async (socket, next) => {
-    console.log("Executed");
     let token = socket.handshake.auth.token;
     
-    if(socket.data.user === undefined) {
+    if(!socket.data.user) {
         let user = await get_user(token);
         if(!user) return next(new Error("Authentication error"));
         socket.data.user = user;
@@ -36,13 +35,12 @@ io.use(async (socket, next) => {
 });
 
 io.on("connection", (socket) => {
-
     // ---- User events
 
     socket.on("joined", async () => {
-        console.log("User joined");
-        let user = socket.data.user;        
+        let user = socket.data.user;
         let room_id = user.room_id;
+        console.log(`User joined in room ${room_id}`);
         socket.join(room_id);
 
         let users = await room_users(io, room_id);
@@ -51,9 +49,9 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", async () => {
-        console.log("User disconnected");
         let user = socket.data.user;
-        let room_id = socket.data.user.room_id;
+        let room_id = user.room_id;
+        console.log(`User disconnected from room ${room_id}`);
         socket.data.user = null;
 
         socket.leave(room_id);

@@ -8,14 +8,7 @@ export const pool = mariadb.createPool({
 });
 
 export async function query(query, params = []) {
-    let conn = await pool.getConnection();
-    let res = false;
-    try {
-        res = await conn.execute(query, params);
-    } finally {
-        await conn.release();
-    }
-    return res;
+    return await pool.execute(query, params);
 }
 
 export async function get_conn() {

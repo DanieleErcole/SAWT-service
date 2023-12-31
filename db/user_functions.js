@@ -8,8 +8,8 @@ export async function get_user(token) {
         'SELECT id, firstname, lastname, room_id, is_leader, video_token FROM users WHERE video_token = ?',
         [token]
     );
-    
-    if(!res || res.length == 0 || res[0].length > 1)
+
+    if(!res || res.length == 0 || res.length > 1)
         return false;
     
     return res[0];
@@ -17,7 +17,7 @@ export async function get_user(token) {
 
 export async function user_by_id(io, id) {
     let sockets = await io.fetchSockets();
-    for(s in sockets)
+    for(var s of sockets)
         if(s.data.user.id == id)
             return s.data.user;
     return false;
@@ -25,9 +25,9 @@ export async function user_by_id(io, id) {
 
 export async function room_users(io, room_id) {
     let sockets = await io.in(room_id).fetchSockets();
-
     let users = [];
-    for(s in sockets) {
+
+    for(var s of sockets) {
         users.push({
             id: s.data.user.id,
             firstname: s.data.user.firstname,
@@ -35,13 +35,12 @@ export async function room_users(io, room_id) {
             is_leader: s.data.user.is_leader
         });
     }
-
     return users;
 }
 
 export async function get_leader(io, room_id) {
     let sockets = await io.in(room_id).fetchSockets();
-    for(s in sockets)
+    for(var s of sockets)
         if(s.data.user.is_leader)
             return s.data.user;
     return false;
