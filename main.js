@@ -73,10 +73,17 @@ io.on("connection", (socket) => {
     socket.on("set_leader" , async (new_id) => {
         let room_id = socket.data.user.room_id;
         let old_leader = socket.data.user;
-        if(!old_leader.is_leader) return; // Here someone tried to impersonate the old leader, handle this case
+        if(!old_leader.is_leader) {
+            // Here someone tried to impersonate the old leader, handle this case
+            socket.emit("error", {message: "Only the room leader can transfer its role"});
+            return;
+        }
 
         let new_leader = await user_by_id(io, new_id);
-        await assign_new_leader(io, old_leader, new_leader);
+        if(!await assign_new_leader(io, old_leader, new_leader)) {
+            socket.emit("error", {message: "Cannot assign the user as leader"});
+            return;
+        } 
 
         const users = await room_users(io, room_id);
         io.in(room_id).emit("update_user_list", users);
