@@ -60,8 +60,7 @@ io.on("connection", (socket) => {
         let room_usrs = await room_users(io, room_id);
         if(room_usrs.length == 0) return; // The room is empty, I don't need to do anything
 
-        let leader = await get_leader(io, room_id);
-        if(!leader) {
+        if(!await get_leader(io, room_id)) {
             // Assign a new random leader if the previous one left
             if(!await assign_new_leader(io, user)) return;
         }
@@ -83,10 +82,12 @@ io.on("connection", (socket) => {
         if(!await assign_new_leader(io, old_leader, new_leader)) {
             socket.emit("error", {message: "Cannot assign the user as leader"});
             return;
-        } 
+        }
 
+        // Here the leader will always be present
         const users = await room_users(io, room_id);
-        io.in(room_id).emit("update_user_list", users);
+        get_leader(io, room_id).emit("leader_assigned", users);
+        socket.broadcast.in(room_id).emit("update_user_list", users);
     });
 
     // ---- Video events
