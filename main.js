@@ -18,10 +18,10 @@ const io = new Server(server, {
 });
 
 // Authentication middleware
-// Checks if the user is authenticated and saves it in the socket, if it has just connected it searches for it in the db and caches it in the socket data
+// Controlla se l'utente è autenticato salvandolo nel socket, se si è appena connesso lo cerca nel db e lo salva nel campo data del socket
 io.use(async (socket, next) => {
     let token = socket.handshake.auth.token;
-    
+
     if(!socket.data.user) {
         let user = await get_user(token);
         if(!user) return next(new Error("Authentication error"));
@@ -45,7 +45,7 @@ io.on("connection", (socket) => {
 
         let users = await room_users(io, room_id);
         io.in(room_id).emit("update_user_list", users);
-        // Send the video queue to the new user
+        // Mandare la coda dei video all'utente appena entrato
     });
 
     socket.on("disconnect", async () => {
@@ -58,10 +58,10 @@ io.on("connection", (socket) => {
         await disconnect_user(user);
 
         let room_usrs = await room_users(io, room_id);
-        if(room_usrs.length == 0) return; // The room is empty, I don't need to do anything
+        if(room_usrs.length == 0) return; // Stanza vuota, non faccio nulla
 
         if(!await get_leader(io, room_id)) {
-            // Assign a new random leader if the previous one left
+            // Assegno un leader a caso
             if(!await assign_new_leader(io, user)) return;
         }
 
@@ -73,7 +73,7 @@ io.on("connection", (socket) => {
         let room_id = socket.data.user.room_id;
         let old_leader = socket.data.user;
         if(!old_leader.is_leader) {
-            // Here someone tried to impersonate the old leader, handle this case
+            // Qui qualcuno ha provato a fare il furbo cercando di impersonare il leader
             socket.emit("error", {message: "Only the room leader can transfer its role"});
             return;
         }
@@ -84,7 +84,7 @@ io.on("connection", (socket) => {
             return;
         }
 
-        // Here the leader will always be present
+        // Il leader qui sarà sempre assegnato
         const users = await room_users(io, room_id);
         get_leader(io, room_id).emit("leader_assigned", users);
         socket.broadcast.in(room_id).emit("update_user_list", users);
