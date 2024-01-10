@@ -42,7 +42,7 @@ export async function get_leader(io, room_id) {
     let sockets = await io.in(room_id).fetchSockets();
     for(var s of sockets)
         if(s.data.user.is_leader)
-            return s.data.user;
+            return s;
     return false;
 }
 
