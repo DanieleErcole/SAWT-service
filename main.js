@@ -34,6 +34,8 @@ io.use(async (socket, next) => {
     next();
 });
 
+//TODO: quando si connette un utente, attualmente notifico il leader ma non aggiungo l'evento al pulsante del nuovo utente appena connesso, risolvere
+
 io.on("connection", (socket) => {
     // ---- User events
 
@@ -44,8 +46,22 @@ io.on("connection", (socket) => {
         socket.join(room_id);
 
         let users = await room_users(io, room_id);
+        // Room previously empty
+        if(user.is_leader)
+            socket.emit("leader_assigned");
         io.in(room_id).emit("update_user_list", users);
+
         // Mandare la coda dei video all'utente appena entrato
+
+        if(user.is_leader) // First user, play the video
+            socket.emit("play", 0);
+        else {
+            let leader = await get_leader(io, room_id);
+            leader.once("video_time", (position) => {
+                socket.emit("play", position);
+            });
+            leader.emit("new_user");
+        }
     });
 
     socket.on("disconnect", async () => {
@@ -85,9 +101,9 @@ io.on("connection", (socket) => {
         }
 
         // Il leader qui sarà sempre assegnato
+        get_leader(io, room_id).emit("leader_assigned");
         const users = await room_users(io, room_id);
-        get_leader(io, room_id).emit("leader_assigned", users);
-        socket.broadcast.in(room_id).emit("update_user_list", users);
+        io.in(room_id).emit("update_user_list", users);
     });
 
     // ---- Video events
@@ -95,11 +111,19 @@ io.on("connection", (socket) => {
     socket.on("add", (url) => {
         let user = socket.data.user;
         // Aggiungere il video nel db
+        // prendersi la lista video aggiornata
+        // video = {id, url}
+        let videos;
+        socket.broadcast.to(room_id).emit("update_video_list", videos);
     });
 
     socket.on("remove", (id) => {
+        // Nella query oltre all'ID nel where fare il check della room_id, altrimenti un utente può rimuovere un video in un'altra stanza dove lui non è presente
         let user = socket.data.user;
         // Rimuovere il video nel db
+        // prendersi la lista video aggiornata
+        let videos;
+        socket.broadcast.to(room_id).emit("update_video_list", videos);
     });
 
     socket.on("resume", () => {
@@ -111,7 +135,7 @@ io.on("connection", (socket) => {
     socket.on("pause", () => {
         if (!socket.data.user.is_leader) return;
         let room_id = socket.data.user.room_id;
-        socket.broadcast.to(room_id).emit("play");
+        socket.broadcast.to(room_id).emit("pause");
     });
 
     socket.on("seek", (position) => {
