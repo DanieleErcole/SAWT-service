@@ -1,11 +1,9 @@
 import mariadb from 'mariadb';
+import { readFileSync } from 'fs';
 
-export const pool = mariadb.createPool({
-    host: 'localhost',
-    user: 'root', // s5218127
-    password: '', // Aledanicamo02
-    database: 'test' //s5218127
-});
+// get configs from file
+let config = JSON.parse(readFileSync('./db/config.json', 'utf8'));
+export const pool = mariadb.createPool(config);
 
 export async function query(query, params = []) {
     return await pool.execute(query, params);
