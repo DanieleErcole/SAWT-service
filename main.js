@@ -79,6 +79,8 @@ io.on("connection", (socket) => {
         if(!await get_leader(io, room_id)) {
             // Assegno un leader a caso
             if(!await assign_new_leader(io, user)) return;
+            let leader = await get_leader(io, room_id);
+            leader.emit("leader_assigned");
         }
 
         let users = await room_users(io, room_id);
