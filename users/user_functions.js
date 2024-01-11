@@ -1,4 +1,4 @@
-import { query, get_conn } from "./db_connection.js";
+import { query, get_conn } from "../db/db_connection.js";
 
 // NOTE: If something in the db fails, like the assigment of a new leader aftre the disconnection of the previous one, the user will be disconnected anyway,
 //      but the room will be left in an inconsistent state, with no leader. Handle the error, like notifying the users or disconnecting them

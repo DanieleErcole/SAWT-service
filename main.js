@@ -6,7 +6,14 @@ import {
     get_leader, 
     assign_new_leader,
     get_user
-} from "./db/user_functions.js"
+} from "./users/user_functions.js"
+import {
+    get_playing_video,
+    get_room_videos, 
+    add_video,
+    remove_video,
+    video_finished
+} from "./videos/video_functions.js"
 
 const port = 3030;
 
@@ -52,6 +59,8 @@ io.on("connection", (socket) => {
         io.in(room_id).emit("update_user_list", users);
 
         // Mandare la coda dei video all'utente appena entrato
+        let videos = await get_room_videos(room_id);
+        socket.emit("update_video_list", videos);
 
         if(user.is_leader) // First user, play the video
             socket.emit("play", 0);
@@ -110,23 +119,49 @@ io.on("connection", (socket) => {
 
     // ---- Video events
 
-    socket.on("add", (url) => {
+    socket.on("add", async (url) => {
         let user = socket.data.user;
+        console.log(`Added video to room ${user.room_id}`);
+
+        let is_first = await get_playing_video(user.room_id) ? false : true;
+        console.log(is_first);
         // Aggiungere il video nel db
-        // prendersi la lista video aggiornata
-        // video = {id, url}
-        let videos;
-        socket.broadcast.to(room_id).emit("update_video_list", videos);
+        if(!await add_video(user.room_id, url, is_first)) {
+            socket.emit("error", {message: "Error adding the video to the room queue"});
+            return;
+        }
+
+        let videos = await get_room_videos(user.room_id);
+        console.log(videos);
+        io.in(user.room_id).emit("update_video_list", videos);
+        if(is_first)
+            io.in(user.room_id).emit("play", 0);
     });
 
-    socket.on("remove", (id) => {
+    socket.on("remove", async (id) => {
         // Nella query oltre all'ID nel where fare il check della room_id, altrimenti un utente può rimuovere un video in un'altra stanza dove lui non è presente
         let user = socket.data.user;
         // Rimuovere il video nel db
         // prendersi la lista video aggiornata
-        let videos;
-        socket.broadcast.to(room_id).emit("update_video_list", videos);
+        let videos = await get_room_videos(user.room_id);
+        io.in(user.room_id).emit("update_video_list", videos);
     });
+
+    socket.on("ended", async () => {
+        if (!socket.data.user.is_leader) return;
+        let room_id = socket.data.user.room_id;
+
+        if(!await video_finished(user.room_id)) {
+            socket.emit("error", {message: "Error retrieving the next video from the queue"});
+            return;
+        }
+
+        let videos = await get_room_videos(room_id);
+        io.in(room_id).emit("update_video_list", videos);
+        io.in(room_id).emit("play", 0);
+    });
+
+    // ---- Player events
 
     socket.on("resume", () => {
         if (!socket.data.user.is_leader) return;
@@ -143,6 +178,7 @@ io.on("connection", (socket) => {
     socket.on("seek", (position) => {
         if (!socket.data.user.is_leader) return;
         let room_id = socket.data.user.room_id;
+        console.log("The leader seeked to position " + position);
         socket.broadcast.to(room_id).emit("seek", position);
     });
 
