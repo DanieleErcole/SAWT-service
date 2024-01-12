@@ -20,7 +20,7 @@ const port = 3030;
 const server = createServer();
 const io = new Server(server, {
     cors: {
-        origin: 'http://localhost'
+        origin: ['http://localhost', 'http://192.168.1.106']
     }
 });
 
@@ -178,7 +178,6 @@ io.on("connection", (socket) => {
     socket.on("seek", (position) => {
         if (!socket.data.user.is_leader) return;
         let room_id = socket.data.user.room_id;
-        console.log("The leader seeked to position " + position);
         socket.broadcast.to(room_id).emit("seek", position);
     });
 

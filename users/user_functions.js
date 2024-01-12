@@ -16,34 +16,22 @@ export async function get_user(token) {
 }
 
 export async function user_by_id(io, id) {
-    let sockets = await io.fetchSockets();
-    for(var s of sockets)
-        if(s.data.user.id == id)
-            return s.data.user;
-    return false;
+    return (await io.fetchSockets()).find(s => s.data.user.id == id);
 }
 
 export async function room_users(io, room_id) {
-    let sockets = await io.in(room_id).fetchSockets();
-    let users = [];
-
-    for(var s of sockets) {
-        users.push({
+    return (await io.in(room_id).fetchSockets()).map(s => {
+        return {
             id: s.data.user.id,
             firstname: s.data.user.firstname,
             lastname: s.data.user.lastname,
             is_leader: s.data.user.is_leader
-        });
-    }
-    return users;
+        };
+    });
 }
 
 export async function get_leader(io, room_id) {
-    let sockets = await io.in(room_id).fetchSockets();
-    for(var s of sockets)
-        if(s.data.user.is_leader)
-            return s;
-    return false;
+    return (await io.in(room_id).fetchSockets()).find(s => s.data.user.is_leader);
 }
 
 export async function disconnect_user(user) {
@@ -66,7 +54,6 @@ async function get_leader_random(io, room_id) {
 
 export async function assign_new_leader(io, old_leader, new_leader = false) {
     let room_id = old_leader.room_id;
-    let res = true;
 
     try {
         let conn = await get_conn();
@@ -86,14 +73,11 @@ export async function assign_new_leader(io, old_leader, new_leader = false) {
         await conn.commit();
     } catch(err) {
         await conn.rollback();
-        res = false;
-    } finally {
-        await conn.release();
+        return false;
     }
 
-    if(res) {
-        old_leader.is_leader = false;
-        new_leader.is_leader = true;
-    }
-    return res;
+    old_leader.is_leader = false;
+    let new_leader_socket = (await io.in(room_id).fetchSockets()).find(s => s.data.user.id == new_leader.id);
+    new_leader_socket.data.user.is_leader = true;
+    return true;
 }
