@@ -47,7 +47,6 @@ export async function remove_video(room_id, id) {
 }
 
 export async function video_finished(room_id) {
-    let res = true;
     try {
         let conn = await get_conn();
         await conn.beginTransaction();
@@ -73,9 +72,7 @@ export async function video_finished(room_id) {
         await conn.commit();
     } catch(err) {
         await conn.rollback();
-        res = false;
-    } finally {
-        await conn.release();
+        return false;
     }
-    return res;
+    return true;
 }

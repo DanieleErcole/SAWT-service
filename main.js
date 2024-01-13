@@ -66,10 +66,10 @@ io.on("connection", (socket) => {
             socket.emit("play", 0);
         else {
             let leader = await get_leader(io, room_id);
-            leader.once("video_time", (position) => {
+            leader.once("video_state", (position, _) => {
                 socket.emit("play", position);
             });
-            leader.emit("new_user");
+            leader.emit("state_request");
         }
     });
 
@@ -163,21 +163,42 @@ io.on("connection", (socket) => {
 
     // ---- Player events
 
-    socket.on("resume", () => {
-        if (!socket.data.user.is_leader) return;
+    socket.on("resume", async (position) => {
         let room_id = socket.data.user.room_id;
-        socket.broadcast.to(room_id).emit("resume");
+        if(!socket.data.user.is_leader) {
+            let leader = await get_leader(io, room_id);
+            leader.once("video_state", (pos, paused) => {
+                if(paused) socket.emit("pause", pos);
+            });
+            leader.emit("state_request");
+            return;
+        }
+        socket.broadcast.to(room_id).emit("resume", position);
     });
 
-    socket.on("pause", () => {
-        if (!socket.data.user.is_leader) return;
+    socket.on("pause", async (position) => {
         let room_id = socket.data.user.room_id;
-        socket.broadcast.to(room_id).emit("pause");
+        if(!socket.data.user.is_leader) {
+            let leader = await get_leader(io, room_id);
+            leader.once("video_state", (pos, paused) => {
+                if(!paused) socket.emit("resume", pos);
+            });
+            leader.emit("state_request");
+            return;
+        }
+        socket.broadcast.to(room_id).emit("pause", position);
     });
 
-    socket.on("seek", (position) => {
-        if (!socket.data.user.is_leader) return;
+    socket.on("seek", async (position) => {
         let room_id = socket.data.user.room_id;
+        if(!socket.data.user.is_leader) {
+            let leader = await get_leader(io, room_id);
+            leader.once("video_state", (pos, _) => {
+                if(pos != position) socket.emit("seek", pos);
+            });
+            leader.emit("state_request");
+            return;
+        }
         socket.broadcast.to(room_id).emit("seek", position);
     });
 
