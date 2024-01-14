@@ -62,9 +62,11 @@ export async function video_finished(room_id) {
             'UPDATE video SET is_playing = FALSE WHERE room_id = ? AND id = ?',
             [room_id, current_video.id]
         );
-
-        let next_video = room_videos[room_videos.indexOf(current_video) + 1];
-        console.log(next_video); // test per vedere se è un array o no
+        
+        // The video is not the last one
+        let next_video = 
+            room_videos.indexOf(current_video) != room_videos.length - 1 ? 
+                room_videos[room_videos.indexOf(current_video) + 1] : room_videos[0];
         await conn.execute(
             'UPDATE video SET is_playing = TRUE WHERE room_id = ? AND id = ?',
             [room_id, next_video.id]

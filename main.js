@@ -15,6 +15,8 @@ import {
     video_finished
 } from "./videos/video_functions.js"
 
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
 const port = 3030;
 
 const server = createServer();
@@ -151,7 +153,7 @@ io.on("connection", (socket) => {
         if (!socket.data.user.is_leader) return;
         let room_id = socket.data.user.room_id;
 
-        if(!await video_finished(user.room_id)) {
+        if(!await video_finished(socket.data.user.room_id)) {
             socket.emit("error", {message: "Error retrieving the next video from the queue"});
             return;
         }
