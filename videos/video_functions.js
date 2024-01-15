@@ -1,11 +1,23 @@
 import { query, get_conn } from "../db/db_connection.js";
 
+const regex = {
+    youtube: /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=(?:[a-zA-Z0-9_]+)|youtu\.be\/(?:[a-zA-Z\d_]+))(?:&.*)?$/,
+    vimeo: /(?:http|https)?:\/\/(?:www\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|)(?:\d+)/,
+    dailymotion: /(?:https?:\/\/)?(?:www\.)?dai\.?ly(?:motion)?(?:\.com)?\/?.*(?:video|embed)?(?:.*v=|v\/|\/)[\w\-]+/,
+    video: /https:\/\/(.*)/,
+};
+
+export function is_valid(url){
+    return regex.youtube.test(url) || regex.vimeo.test(url) || regex.dailymotion.test(url) || regex.video.test(url);
+}
+
 export async function get_playing_video(room_id) {
     try {
-        return await query(
+        let res = await query(
             'SELECT * FROM video WHERE room_id = ? AND is_playing = TRUE',
             [room_id]    
-        )[0];
+        );
+        return res[0];
     } catch(err) {
         return false;
     }
@@ -14,7 +26,7 @@ export async function get_playing_video(room_id) {
 export async function get_room_videos(room_id) {
     try {
         return await query(
-            'SELECT * FROM video WHERE room_id = ?',
+            'SELECT url, is_playing FROM video WHERE room_id = ?',
             [room_id]
         );
     } catch(err) {
@@ -55,7 +67,6 @@ export async function video_finished(room_id) {
             'SELECT id, is_playing, added_date FROM video WHERE room_id = ? ORDER BY added_date ASC',
             [room_id]
         );
-        console.log(room_videos);
 
         let current_video = room_videos.find(v => v.is_playing);
         await conn.execute(

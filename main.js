@@ -12,7 +12,8 @@ import {
     get_room_videos, 
     add_video,
     remove_video,
-    video_finished
+    video_finished,
+    is_valid
 } from "./videos/video_functions.js"
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
@@ -122,11 +123,15 @@ io.on("connection", (socket) => {
     // ---- Video events
 
     socket.on("add", async (url) => {
+        if(!is_valid(url)) {
+            socket.emit("error", {message: "URL is not valid"});
+            return;
+        }
+
         let user = socket.data.user;
         console.log(`Added video to room ${user.room_id}`);
 
         let is_first = await get_playing_video(user.room_id) ? false : true;
-        console.log(is_first);
         // Aggiungere il video nel db
         if(!await add_video(user.room_id, url, is_first)) {
             socket.emit("error", {message: "Error adding the video to the room queue"});
@@ -134,7 +139,6 @@ io.on("connection", (socket) => {
         }
 
         let videos = await get_room_videos(user.room_id);
-        console.log(videos);
         io.in(user.room_id).emit("update_video_list", videos);
         if(is_first)
             io.in(user.room_id).emit("play", 0);
@@ -150,9 +154,12 @@ io.on("connection", (socket) => {
     });
 
     socket.on("ended", async () => {
-        if (!socket.data.user.is_leader) return;
-        let room_id = socket.data.user.room_id;
+        if(!socket.data.user.is_leader) {
+            socket.emit("error", {message: "Sorry, only the leader can skip the video"});
+            return;
+        }
 
+        let room_id = socket.data.user.room_id;
         if(!await video_finished(socket.data.user.room_id)) {
             socket.emit("error", {message: "Error retrieving the next video from the queue"});
             return;
