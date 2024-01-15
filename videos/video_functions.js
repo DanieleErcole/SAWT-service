@@ -26,7 +26,7 @@ export async function get_playing_video(room_id) {
 export async function get_room_videos(room_id) {
     try {
         return await query(
-            'SELECT url, is_playing FROM video WHERE room_id = ?',
+            'SELECT id, url, is_playing FROM video WHERE room_id = ?',
             [room_id]
         );
     } catch(err) {
