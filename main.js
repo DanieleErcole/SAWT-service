@@ -148,9 +148,24 @@ io.on("connection", (socket) => {
         // Nella query oltre all'ID nel where fare il check della room_id, altrimenti un utente può rimuovere un video in un'altra stanza dove lui non è presente
         let user = socket.data.user;
         // Rimuovere il video nel db
+        let cur = await get_playing_video(user.room_id);
+        let is_current_video = cur.id === id;
+        if(is_current_video) {
+            if(!await video_finished(user.room_id)) {
+                socket.emit("error", {message: "Error removing the video from the room queue"});
+                return;
+            }
+        }
+
+        if(!await remove_video(user.room_id, id)) {
+            socket.emit("error", {message: "Error removing the video from the room queue"});
+            return;
+        }
         // prendersi la lista video aggiornata
         let videos = await get_room_videos(user.room_id);
         io.in(user.room_id).emit("update_video_list", videos);
+        if(is_current_video)
+            io.in(user.room_id).emit("play", 0);
     });
 
     socket.on("ended", async () => {
