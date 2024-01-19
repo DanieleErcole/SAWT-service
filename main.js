@@ -23,7 +23,7 @@ const port = 3030;
 const server = createServer();
 const io = new Server(server, {
     cors: {
-        origin: ['http://localhost', 'http://192.168.1.106']
+        origin: ['http://localhost', 'http://saw21.dibris.unige.it']
     }
 });
 
