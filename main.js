@@ -5,7 +5,8 @@ import {
     disconnect_user,  
     get_leader, 
     assign_new_leader,
-    get_user
+    get_user,
+    user_by_id
 } from "./users/user_functions.js"
 import {
     get_playing_video,
@@ -115,7 +116,8 @@ io.on("connection", (socket) => {
         }
 
         // Il leader qui sarà sempre assegnato
-        get_leader(io, room_id).emit("leader_assigned");
+        let leader = await get_leader(io, room_id);
+        leader.emit("leader_assigned");
         const users = await room_users(io, room_id);
         io.in(room_id).emit("update_user_list", users);
     });

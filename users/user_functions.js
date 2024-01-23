@@ -52,9 +52,10 @@ async function get_leader_random(io, room_id) {
     return new_leader;
 }
 
-export async function assign_new_leader(io, old_leader, new_leader = false) {
+export async function assign_new_leader(io, old_leader, new_leader_socket = false) {
     let room_id = old_leader.room_id;
 
+    let new_leader = false;
     try {
         let conn = await get_conn();
         await conn.beginTransaction();
@@ -62,9 +63,8 @@ export async function assign_new_leader(io, old_leader, new_leader = false) {
             'UPDATE users SET is_leader = FALSE WHERE id = ?',
             [old_leader.id]
         );
-
-        if(!new_leader)
-            new_leader = await get_leader_random(io, room_id);
+        
+        new_leader = new_leader_socket ? new_leader_socket.data.user : await get_leader_random(io, room_id);
 
         await conn.execute(
             'UPDATE users SET is_leader = TRUE WHERE id = ?',
@@ -77,7 +77,7 @@ export async function assign_new_leader(io, old_leader, new_leader = false) {
     }
 
     old_leader.is_leader = false;
-    let new_leader_socket = (await io.in(room_id).fetchSockets()).find(s => s.data.user.id == new_leader.id);
-    new_leader_socket.data.user.is_leader = true;
+    let s = (await io.in(room_id).fetchSockets()).find(s => s.data.user.id == new_leader.id);
+    s.data.user.is_leader = true;
     return true;
 }
