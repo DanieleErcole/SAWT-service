@@ -69,6 +69,7 @@ io.on("connection", (socket) => {
         if(user.is_leader) // First user, play the video
             socket.emit("play", 0);
         else {
+            // Fixare, se un utente entra mentre il leader si sta ancora connettendo, qua è undefined, fare che solo qua lo vado a cercare dal db
             let leader = await get_leader(io, room_id);
             leader.once("video_state", (position, _) => {
                 socket.emit("play", position);
@@ -116,8 +117,7 @@ io.on("connection", (socket) => {
         }
 
         // Il leader qui sarà sempre assegnato
-        let leader = await get_leader(io, room_id);
-        leader.emit("leader_assigned");
+        new_leader.emit("leader_assigned");
         const users = await room_users(io, room_id);
         io.in(room_id).emit("update_user_list", users);
     });
