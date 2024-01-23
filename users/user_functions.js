@@ -30,6 +30,18 @@ export async function room_users(io, room_id) {
     });
 }
 
+export async function get_leader_from_db(room_id) {
+    const res = await query(
+        'SELECT id, firstname, lastname, room_id, is_leader, video_token FROM users WHERE room_id = ? AND is_leader = TRUE',
+        [room_id]
+    );
+
+    if(!res || res.length == 0 || res.length > 1)
+        return false;
+    
+    return res[0];
+}
+
 export async function get_leader(io, room_id) {
     return (await io.in(room_id).fetchSockets()).find(s => s.data.user.is_leader);
 }

@@ -6,7 +6,8 @@ import {
     get_leader, 
     assign_new_leader,
     get_user,
-    user_by_id
+    user_by_id,
+    get_leader_from_db
 } from "./users/user_functions.js"
 import {
     get_playing_video,
@@ -45,8 +46,6 @@ io.use(async (socket, next) => {
     next();
 });
 
-//TODO: quando si connette un utente, attualmente notifico il leader ma non aggiungo l'evento al pulsante del nuovo utente appena connesso, risolvere
-
 io.on("connection", (socket) => {
     // ---- User events
 
@@ -66,11 +65,15 @@ io.on("connection", (socket) => {
         let videos = await get_room_videos(room_id);
         socket.emit("update_video_list", videos);
 
-        if(user.is_leader) // First user, play the video
+        if(user.is_leader) // Primo utente, riproduco il video
             socket.emit("play", 0);
         else {
-            // Fixare, se un utente entra mentre il leader si sta ancora connettendo, qua è undefined, fare che solo qua lo vado a cercare dal db
             let leader = await get_leader(io, room_id);
+            if(!leader) {
+                socket.disconnect();
+                return;
+            }
+
             leader.once("video_state", (position, _) => {
                 socket.emit("play", position);
             });
