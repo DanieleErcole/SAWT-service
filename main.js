@@ -7,7 +7,7 @@ import {
     assign_new_leader,
     get_user,
     user_by_id,
-    get_leader_from_db
+    room_sockets
 } from "./users/user_functions.js"
 import {
     get_playing_video,
@@ -55,11 +55,18 @@ io.on("connection", (socket) => {
         console.log(`User joined in room ${room_id}`);
         socket.join(room_id);
 
-        let users = await room_users(io, room_id);
+        let sockets = await room_sockets(io, room_id);
+        let same_user = sockets.find(u => u.id === user.id);
+        if(same_user) { // Non ci entra mai, anche se prima di scrivere tutta sta parte era entrato 2 volte, boh io lo lascio per sicurezza
+            console.log("Same user 2 times in the room, removing the old one");
+            let s = await user_by_id(io, same_user.id);
+            s.leave(room_id);
+        }
+
         // Room previously empty
         if(user.is_leader)
             socket.emit("leader_assigned");
-        io.in(room_id).emit("update_user_list", users);
+        io.in(room_id).emit("update_user_list", await room_users(io, room_id));
 
         // Mandare la coda dei video all'utente appena entrato
         let videos = await get_room_videos(room_id);
@@ -69,7 +76,9 @@ io.on("connection", (socket) => {
             socket.emit("play", 0);
         else {
             let leader = await get_leader(io, room_id);
+            // Forse non più necessario, per ora lascio per sicurezza
             if(!leader) {
+                console.log("No leader found");
                 socket.disconnect();
                 return;
             }
