@@ -7,8 +7,14 @@ import {
     assign_new_leader,
     get_user,
     user_by_id,
-    room_sockets
-} from "./users/user_functions.js"
+    room_sockets,
+} from "./users/users.js"
+import {
+    is_mod,
+    assign_mod,
+    remove_mod,
+    is_room_owner
+} from "./users/moderators.js"
 import {
     get_playing_video,
     get_room_videos, 
@@ -16,7 +22,7 @@ import {
     remove_video,
     video_finished,
     is_valid
-} from "./videos/video_functions.js"
+} from "./videos/videos.js"
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -37,6 +43,9 @@ io.use(async (socket, next) => {
     if(!socket.data.user) {
         let user = await get_user(token);
         if(!user) return next(new Error("Authentication error"));
+        user.is_mod = await is_mod(user.room_id, user.id);
+        user.is_owner = await is_room_owner(user.room_id, user.id);
+
         socket.data.user = user;
         return next();
     }
@@ -59,10 +68,10 @@ io.on("connection", (socket) => {
         let same_user = sockets.find(u => u.id === user.id);
         if(same_user) { // Non ci entra mai, anche se prima di scrivere tutta sta parte era entrato 2 volte, boh io lo lascio per sicurezza
             console.log("Same user 2 times in the room, removing the old one");
-            let s = await user_by_id(io, same_user.id);
-            s.leave(room_id);
+            same_user.leave(room_id);
         }
 
+        socket.emit("id", user.id);
         // Room previously empty
         if(user.is_leader)
             socket.emit("leader_assigned");
@@ -240,7 +249,60 @@ io.on("connection", (socket) => {
         socket.broadcast.to(room_id).emit("seek", position);
     });
 
-    // ---- Mod events ??? non so se vanno qua
+    // ---- Mod events
+
+    socket.on("assign_mod", async (id) => {
+        let user = socket.data.user;
+        if(!user.is_owner) {
+            socket.emit("error", {message: "Only the room owner can assign moderators"});
+            return;
+        }
+
+        let user_to_assign = await user_by_id(io, id);
+        //TODO: forse controllare che l'utente non sia mod, ma non credo sia necessario
+        if(!await assign_mod(user.room_id, user_to_assign.data.user)) {
+            socket.emit("error", {message: "Error assigning the moderator"});
+            return;
+        }
+
+        user_to_assign.emit("notification", "You have been assigned as moderator");
+        io.in(user.room_id).emit("update_user_list", await room_users(io, user.room_id));
+    });
+
+    socket.on("remove_mod", async (id) => {
+        let user = socket.data.user;
+        if(!user.is_owner) {
+            socket.emit("error", {message: "Only the room owner can remove moderators"});
+            return;
+        }
+
+        let user_to_remove = await user_by_id(io, id);
+        //TODO: forse controllare che l'utente sia mod, ma non credo sia necessario
+        if(!await remove_mod(user.room_id, user_to_remove.data.user)) {
+            socket.emit("error", {message: "Error removing the moderator"});
+            return;
+        }
+
+        user_to_remove.emit("notification", "You have been removed from the moderators");
+        io.in(user.room_id).emit("update_user_list", await room_users(io, user.room_id));
+    });
+
+    socket.on("kick", async (id) => {
+        let user = socket.data.user;
+        if(!user.is_mod) {
+            socket.emit("error", {message: "Only the moderators can kick users from the room"});
+            return;
+        }
+
+        //TODO: forse controllare che l'utente sia effettivamente nella stanza
+        let user_to_kick = await user_by_id(io, id);
+        let username = `${user_to_kick.data.user.firstname} ${user_to_kick.data.user.lastname}`;
+
+        user_to_kick.emit("notification", "You'll be kicked from the room in 3 seconds");
+        user_to_kick.leave(user.room_id);
+        delay(3000).then(() => user_to_kick.disconnect());
+        socket.broadcast.to(user.room_id).emit("notification", `${username} has been kicked from the room`);
+    });
 
 });
 
