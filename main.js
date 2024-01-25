@@ -132,7 +132,7 @@ io.on("connection", (socket) => {
         }
 
         let new_leader = await user_by_id(io, new_id);
-        if(!await assign_new_leader(io, old_leader, new_leader)) {
+        if(!new_leader || !await assign_new_leader(io, old_leader, new_leader)) {
             socket.emit("error", {message: "Cannot assign the user as leader"});
             return;
         }
@@ -260,7 +260,7 @@ io.on("connection", (socket) => {
 
         let user_to_assign = await user_by_id(io, id);
         //TODO: forse controllare che l'utente non sia mod, ma non credo sia necessario
-        if(!await assign_mod(user.room_id, user_to_assign.data.user)) {
+        if(!user_to_assign || !await assign_mod(user.room_id, user_to_assign.data.user)) {
             socket.emit("error", {message: "Error assigning the moderator"});
             return;
         }
@@ -278,7 +278,7 @@ io.on("connection", (socket) => {
 
         let user_to_remove = await user_by_id(io, id);
         //TODO: forse controllare che l'utente sia mod, ma non credo sia necessario
-        if(!await remove_mod(user.room_id, user_to_remove.data.user)) {
+        if(!user_to_remove || !await remove_mod(user.room_id, user_to_remove.data.user)) {
             socket.emit("error", {message: "Error removing the moderator"});
             return;
         }
@@ -296,12 +296,19 @@ io.on("connection", (socket) => {
 
         //TODO: forse controllare che l'utente sia effettivamente nella stanza
         let user_to_kick = await user_by_id(io, id);
+        if(!user_to_kick) {
+            socket.emit("error", {message: "User not found"});
+            return;
+        }
         let username = `${user_to_kick.data.user.firstname} ${user_to_kick.data.user.lastname}`;
 
         user_to_kick.emit("notification", "You'll be kicked from the room in 3 seconds");
         user_to_kick.leave(user.room_id);
-        delay(3000).then(() => user_to_kick.disconnect());
-        socket.broadcast.to(user.room_id).emit("notification", `${username} has been kicked from the room`);
+        delay(3000).then(async () => {
+            user_to_kick.disconnect();
+            socket.broadcast.to(user.room_id).emit("notification", `${username} has been kicked from the room`);
+            io.in(user.room_id).emit("update_user_list", await room_users(io, user.room_id));
+        });
     });
 
 });
