@@ -125,9 +125,9 @@ io.on("connection", (socket) => {
     socket.on("set_leader" , async (new_id) => {
         let room_id = socket.data.user.room_id;
         let old_leader = socket.data.user;
-        if(!old_leader.is_leader) {
+        if(!old_leader.is_leader || !old_leader.is_owner) {
             // Qui qualcuno ha provato a fare il furbo cercando di impersonare il leader
-            socket.emit("error", {message: "Only the room leader can transfer its role"});
+            socket.emit("error", {message: "Only the room leader or the room owner can transfer this role"});
             return;
         }
 
@@ -259,8 +259,7 @@ io.on("connection", (socket) => {
         }
 
         let user_to_assign = await user_by_id(io, id);
-        //TODO: forse controllare che l'utente non sia mod, ma non credo sia necessario
-        if(!user_to_assign || !await assign_mod(user.room_id, user_to_assign.data.user)) {
+        if(!user_to_assign || user_to_assign.is_mod || !await assign_mod(user.room_id, user_to_assign.data.user)) {
             socket.emit("error", {message: "Error assigning the moderator"});
             return;
         }
@@ -277,8 +276,7 @@ io.on("connection", (socket) => {
         }
 
         let user_to_remove = await user_by_id(io, id);
-        //TODO: forse controllare che l'utente sia mod, ma non credo sia necessario
-        if(!user_to_remove || !await remove_mod(user.room_id, user_to_remove.data.user)) {
+        if(!user_to_remove || !user_to_remove.is_mod || user_to_remove.is_owner || !await remove_mod(user.room_id, user_to_remove.data.user)) {
             socket.emit("error", {message: "Error removing the moderator"});
             return;
         }
