@@ -1,7 +1,7 @@
 import { query, get_conn } from "../db/db_connection.js";
 
 const regex = {
-    youtube: /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=(?:[a-zA-Z0-9_]+)|youtu\.be\/(?:[a-zA-Z\d_]+))(?:&.*)?$/,
+    youtube: /^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube(-nocookie)?\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)(?!(user))([\w\-]+)(\S+)?$/,
     vimeo: /(?:http|https)?:\/\/(?:www\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|)(?:\d+)/,
     dailymotion: /(?:https?:\/\/)?(?:www\.)?dai\.?ly(?:motion)?(?:\.com)?\/?.*(?:video|embed)?(?:.*v=|v\/|\/)[\w\-]+/,
     video: /https:\/\/(.*)/,
