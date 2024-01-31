@@ -304,7 +304,7 @@ io.on("connection", (socket) => {
         user_to_kick.leave(user.room_id);
         delay(3000).then(async () => {
             user_to_kick.disconnect();
-            socket.broadcast.to(user.room_id).emit("notification", `${username} has been kicked from the room`);
+            io.in(user.room_id).emit("notification", `${username} has been kicked from the room`);
             io.in(user.room_id).emit("update_user_list", await room_users(io, user.room_id));
         });
     });
