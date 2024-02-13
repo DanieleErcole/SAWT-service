@@ -88,6 +88,7 @@ io.on("connection", (socket) => {
             // Forse non più necessario, per ora lascio per sicurezza
             if(!leader) {
                 console.log("No leader found");
+                socket.emit("error", {message: "Something went wrong while connecting to the room..."});
                 socket.disconnect();
                 return;
             }
