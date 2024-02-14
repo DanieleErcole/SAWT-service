@@ -8,6 +8,7 @@ import {
     get_user,
     user_by_id,
     room_sockets,
+    leader_id_from_db,
 } from "./users/users.js"
 import {
     is_mod,
@@ -85,12 +86,12 @@ io.on("connection", (socket) => {
             socket.emit("play", 0);
         else {
             let leader = await get_leader(io, room_id);
-            // Forse non più necessario, per ora lascio per sicurezza
-            if(!leader) {
+            // Sono abbastanza sicuro che questa roba non serva, per fare danni il db si dovrebbe spegnere per tipo 10 secondi e lì il servizio esce
+            if(!leader && !await user_by_id(await leader_id_from_db(room_id))) { // A parte il caso descritto sotto il leader qui esiste sempre
+                // Quando il vecchio leader si è disconnesso qualcosa è andato storto nel disconnetterlo, nel db è ancora connesso e risulta che ci sia un leader
                 console.log("No leader found");
-                socket.emit("error", {message: "Something went wrong while connecting to the room..."});
-                socket.disconnect();
-                return;
+                if(!await assign_new_leader(io, room_id)) return;
+                leader = await get_leader(io, room_id);
             }
 
             leader.once("video_state", (position, _) => {
@@ -114,7 +115,7 @@ io.on("connection", (socket) => {
 
         if(!await get_leader(io, room_id)) {
             // Assegno un leader a caso
-            if(!await assign_new_leader(io, user)) return;
+            if(!await assign_new_leader(io, room_id, user)) return;
             let leader = await get_leader(io, room_id);
             leader.emit("leader_assigned");
         }
@@ -128,12 +129,12 @@ io.on("connection", (socket) => {
         let old_leader = socket.data.user;
         if(!old_leader.is_leader) {
             // Qui qualcuno ha provato a fare il furbo cercando di impersonare il leader
-            socket.emit("error", {message: "Only the room leader or the room owner can transfer this role"});
+            socket.emit("error", {message: "Only the room leader can transfer its role"});
             return;
         }
 
         let new_leader = await user_by_id(io, new_id);
-        if(!new_leader || !await assign_new_leader(io, old_leader, new_leader)) {
+        if(!new_leader || !await assign_new_leader(io, room_id, old_leader, new_leader)) {
             socket.emit("error", {message: "Cannot assign the user as leader"});
             return;
         }
@@ -169,7 +170,6 @@ io.on("connection", (socket) => {
     });
 
     socket.on("remove", async (id) => {
-        // Nella query oltre all'ID nel where fare il check della room_id, altrimenti un utente può rimuovere un video in un'altra stanza dove lui non è presente
         let user = socket.data.user;
         // Rimuovere il video nel db
         let cur = await get_playing_video(user.room_id);
@@ -303,11 +303,11 @@ io.on("connection", (socket) => {
 
         user_to_kick.emit("notification", "You'll be kicked from the room in 3 seconds");
         user_to_kick.leave(user.room_id);
-        delay(3000).then(async () => {
-            user_to_kick.disconnect();
-            io.in(user.room_id).emit("notification", `${username} has been kicked from the room`);
-            io.in(user.room_id).emit("update_user_list", await room_users(io, user.room_id));
-        });
+        await delay(3000);
+
+        user_to_kick.disconnect();
+        io.in(user.room_id).emit("notification", `${username} has been kicked from the room`);
+        io.in(user.room_id).emit("update_user_list", await room_users(io, user.room_id));
     });
 
 });

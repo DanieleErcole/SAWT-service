@@ -48,6 +48,18 @@ export async function room_users(io, room_id) {
     });
 }
 
+export async function leader_id_from_db(room_id) {
+    const res = await query(
+        'SELECT id FROM users WHERE room_id = ? AND is_leader = TRUE',
+        [room_id]
+    );
+    
+    if(!res || res.length == 0 || res.length > 1)
+        return false;
+    
+    return res[0].id;
+}
+
 export async function get_leader(io, room_id) {
     return (await io.in(room_id).fetchSockets()).find(s => s.data.user.is_leader);
 }
@@ -59,17 +71,20 @@ async function get_leader_random(io, room_id) {
     return new_leader;
 }
 
-export async function assign_new_leader(io, old_leader, new_leader_socket = false) {
-    let room_id = old_leader.room_id;
-
+// Se old_leader è false, il socket del vecchio leader si è già disconnesso
+export async function assign_new_leader(io, room_id, old_leader = false, new_leader_socket = false) {
     let new_leader = false;
+    let res = true;
+
     try {
         let conn = await get_conn();
         await conn.beginTransaction();
-        await conn.execute(
-            'UPDATE users SET is_leader = FALSE WHERE id = ?',
-            [old_leader.id]
-        );
+        if(old_leader) {
+            await conn.execute(
+                'UPDATE users SET is_leader = FALSE WHERE id = ?',
+                [old_leader.id]
+            );
+        }
         
         new_leader = new_leader_socket ? new_leader_socket.data.user : await get_leader_random(io, room_id);
 
@@ -81,10 +96,13 @@ export async function assign_new_leader(io, old_leader, new_leader_socket = fals
     } catch(err) {
         console.log(err);
         await conn.rollback();
-        return false;
+        res = false;
+    } finally {
+        if(conn) conn.release();
+        if(!res) return false;
     }
 
-    old_leader.is_leader = false;
+    if(old_leader) old_leader.is_leader = false;
     let s = (await io.in(room_id).fetchSockets()).find(s => s.data.user.id == new_leader.id);
     s.data.user.is_leader = true;
     return true;

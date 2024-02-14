@@ -19,6 +19,7 @@ export async function get_playing_video(room_id) {
         );
         return res[0];
     } catch(err) {
+        console.log(err);
         return false;
     }
 }
@@ -30,18 +31,20 @@ export async function get_room_videos(room_id) {
             [room_id]
         );
     } catch(err) {
+        console.log(err);
         return false;
     }
 }
 
 export async function add_video(room_id, url, is_first) {
     try {
-        await query(
+        let res = await query(
             'INSERT INTO video (room_id, url, is_playing) VALUES (?, ?, ?)',
             [room_id, url, is_first]
         );
-        return true;
+        return res.affectedRows == 1;
     } catch(err) {
+        console.log(err);
         return false;
     }
 }
@@ -52,13 +55,15 @@ export async function remove_video(room_id, id) {
             'DELETE FROM video WHERE room_id = ? AND id = ?',
             [room_id, id]
         );
-        return true;
+        return res.affectedRows == 1;
     } catch(err) {
+        console.log(err);
         return false;
     }
 }
 
 export async function video_finished(room_id) {
+    let res = true;
     try {
         let conn = await get_conn();
         await conn.beginTransaction();
@@ -84,8 +89,11 @@ export async function video_finished(room_id) {
         );
         await conn.commit();
     } catch(err) {
+        console.log(err);
         await conn.rollback();
-        return false;
+        res = false;
+    } finally {
+        if(conn) conn.release();
     }
-    return true;
+    return res;
 }
