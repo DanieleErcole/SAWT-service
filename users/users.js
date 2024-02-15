@@ -3,11 +3,11 @@ import { query, get_conn } from "../db/db_connection.js";
 // NOTE: If something in the db fails, like the assigment of a new leader aftre the disconnection of the previous one, the user will be disconnected anyway,
 //      but the room will be left in an inconsistent state, with no leader. Handle the error, like notifying the users or disconnecting them
 
-export async function disconnect_user(user) {
+export async function disconnect_user(id) {
     try {
         return await query(
             'UPDATE users SET video_token = NULL, room_id = NULL, is_leader = NULL WHERE id = ?',
-            [user.id]
+            [id]
         );
     } catch(err) {
         console.log(err);
@@ -71,7 +71,6 @@ async function get_leader_random(io, room_id) {
     return new_leader;
 }
 
-// Se old_leader è false, il socket del vecchio leader si è già disconnesso
 export async function assign_new_leader(io, room_id, old_leader = false, new_leader_socket = false) {
     let new_leader = false;
     let res = true;

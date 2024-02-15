@@ -1,5 +1,5 @@
-import { createServer } from "node:http";
-// import { createServer } from "node:https";
+//import { createServer } from "node:http";
+import { createServer } from "node:https";
 import { Server } from "socket.io";
 import { 
     room_users, 
@@ -31,17 +31,23 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 
 const port = 3030;
 
-const server = createServer(/*{key: readFileSync('./priv/key.pem')}, cert: readFileSync('./priv/cert.pem')*/);
+const server = createServer({key: readFileSync('./priv/key.pem'), cert: readFileSync('./priv/cert.pem')});
 const io = new Server(server, {
     cors: {
-        origin: ['http://localhost', 'http://saw21.dibris.unige.it'/*, 'https://saw21.dibris.unige.it'*/]
+        origin: ['http://localhost', 'https://saw21.dibris.unige.it']
     }
 });
 
-async function is_leader_false_connected(room_id) {
+// Controlla che lo stato del leader in una stanza sia consistente fra db e socket, può succedere ad esempio quando si aggiorna la pagina prima di connettersi al servizio
+async function check_leader_inconsistency(io, room_id) {
     let id = await leader_id_from_db(room_id);
-    if(!id) return false;
-    return await user_by_id(id); 
+    if(!id) // Non c'è un leader nel db, assegno un leader a caso
+        await assign_new_leader(io, room_id);
+    else { // Quando il vecchio leader si è disconnesso qualcosa è andato storto nella disconnessione, nel db è ancora connesso e risulta che ci sia un leader
+        await disconnect_user(id);
+        await assign_new_leader(io, room_id);
+    }
+    return await get_leader(io, room_id);
 }
 
 // Authentication middleware
@@ -94,16 +100,11 @@ io.on("connection", (socket) => {
             socket.emit("play", 0);
         else {
             let leader = await get_leader(io, room_id);
-            // TODO: TESTARE CON + PERSONE
-            if(!leader) { // A parte il caso descritto sotto il leader qui esiste sempre
-                console.log("No leader found");
-                let u = await is_leader_false_connected(room_id);
-                if(!u) {
-                    // Quando il vecchio leader si è disconnesso qualcosa è andato storto nella disconnessione, nel db è ancora connesso e risulta che ci sia un leader
-                    await disconnect_user(u);
-                    if(!await assign_new_leader(io, room_id)) return;
-                    leader = await get_leader(io, room_id);
-                }
+            // Se è true Il leader c'è nel socket e sicuramente nel db (se non è nel db è uscito sicuro, quindi non ci sarà anche il socket), tutto ok
+            if(!leader) {
+                leader = await check_leader_inconsistency(io, room_id);
+                leader.emit("leader_assigned");
+                io.in(room_id).emit("update_user_list", await room_users(io, room_id));
             }
 
             leader.once("video_state", (position, _) => {
@@ -119,8 +120,7 @@ io.on("connection", (socket) => {
         console.log(`User disconnected from room ${room_id}`);
         socket.data.user = null;
 
-        socket.leave(room_id);
-        await disconnect_user(user);
+        await disconnect_user(user.id)
 
         let room_usrs = await room_users(io, room_id);
         if(room_usrs.length == 0) return; // Stanza vuota, non faccio nulla
