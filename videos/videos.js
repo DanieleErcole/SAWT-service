@@ -64,8 +64,9 @@ export async function remove_video(room_id, id) {
 
 export async function video_finished(room_id) {
     let res = true;
+    let conn = await get_conn();
+    
     try {
-        let conn = await get_conn();
         await conn.beginTransaction();
 
         let room_videos = await conn.execute(

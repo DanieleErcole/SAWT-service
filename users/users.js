@@ -76,8 +76,8 @@ export async function assign_new_leader(io, room_id, old_leader = false, new_lea
     let new_leader = false;
     let res = true;
 
+    let conn = await get_conn();
     try {
-        let conn = await get_conn();
         await conn.beginTransaction();
         if(old_leader) {
             await conn.execute(

@@ -32,9 +32,15 @@ const port = 3030;
 const server = createServer();
 const io = new Server(server, {
     cors: {
-        origin: ['http://localhost', 'http://saw21.dibris.unige.it']
+        origin: ['http://localhost', 'https://saw21.dibris.unige.it']
     }
 });
+
+async function is_leader_false_connected(room_id) {
+    let id = await leader_id_from_db(room_id);
+    if(!id) return false;
+    return await user_by_id(id); 
+}
 
 // Authentication middleware
 // Controlla se l'utente è autenticato salvandolo nel socket, se si è appena connesso lo cerca nel db e lo salva nel campo data del socket
@@ -66,8 +72,8 @@ io.on("connection", (socket) => {
         socket.join(room_id);
 
         let sockets = await room_sockets(io, room_id);
-        let same_user = sockets.find(u => u.id === user.id);
-        if(same_user) { // Non ci entra mai, anche se prima di scrivere tutta sta parte era entrato 2 volte, boh io lo lascio per sicurezza
+        let same_user = sockets.find(s => s.id !== socket.id && s.data.user.id === user.id);
+        if(same_user) {
             console.log("Same user 2 times in the room, removing the old one");
             same_user.leave(room_id);
         }
@@ -86,12 +92,16 @@ io.on("connection", (socket) => {
             socket.emit("play", 0);
         else {
             let leader = await get_leader(io, room_id);
-            // Sono abbastanza sicuro che questa roba non serva, per fare danni il db si dovrebbe spegnere per tipo 10 secondi e lì il servizio esce
-            if(!leader && !await user_by_id(await leader_id_from_db(room_id))) { // A parte il caso descritto sotto il leader qui esiste sempre
-                // Quando il vecchio leader si è disconnesso qualcosa è andato storto nel disconnetterlo, nel db è ancora connesso e risulta che ci sia un leader
+            // TODO: TESTARE CON + PERSONE
+            if(!leader) { // A parte il caso descritto sotto il leader qui esiste sempre
                 console.log("No leader found");
-                if(!await assign_new_leader(io, room_id)) return;
-                leader = await get_leader(io, room_id);
+                let u = await is_leader_false_connected(room_id);
+                if(!u) {
+                    // Quando il vecchio leader si è disconnesso qualcosa è andato storto nella disconnessione, nel db è ancora connesso e risulta che ci sia un leader
+                    await disconnect_user(u);
+                    if(!await assign_new_leader(io, room_id)) return;
+                    leader = await get_leader(io, room_id);
+                }
             }
 
             leader.once("video_state", (position, _) => {
