@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+// import { createServer } from "node:https";
 import { Server } from "socket.io";
 import { 
     room_users, 
@@ -24,15 +25,16 @@ import {
     video_finished,
     is_valid
 } from "./videos/videos.js"
+import { readFileSync } from "node:fs"; 
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
 const port = 3030;
 
-const server = createServer();
+const server = createServer(/*{key: readFileSync('./priv/key.pem')}, cert: readFileSync('./priv/cert.pem')*/);
 const io = new Server(server, {
     cors: {
-        origin: ['http://localhost', 'https://saw21.dibris.unige.it']
+        origin: ['http://localhost', 'http://saw21.dibris.unige.it'/*, 'https://saw21.dibris.unige.it'*/]
     }
 });
 
