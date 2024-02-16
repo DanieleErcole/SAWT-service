@@ -31,9 +31,9 @@ export async function user_by_id(io, id) {
     return (await io.fetchSockets()).find(s => s.data.user.id == id);
 }
 
-export async function room_sockets(io, room_id) {
+/*export async function room_sockets(io, room_id) {
     return await io.in(room_id).fetchSockets();
-}
+}*/
 
 export async function room_users(io, room_id) {
     return (await io.in(room_id).fetchSockets()).map(s => {

@@ -8,7 +8,6 @@ import {
     assign_new_leader,
     get_user,
     user_by_id,
-    room_sockets,
     leader_id_from_db,
 } from "./users/users.js"
 import {
@@ -79,11 +78,13 @@ io.on("connection", (socket) => {
         console.log(`User joined in room ${room_id}`);
         socket.join(room_id);
 
-        let sockets = await room_sockets(io, room_id);
-        let same_user = sockets.find(s => s.id !== socket.id && s.data.user.id === user.id);
+        let sockets = await io.fetchSockets();
+        let same_user = sockets.find(s => s.id !== socket.id && s.data.user.id === user.id); // Prendo il più "vecchio"
         if(same_user) {
-            console.log("Same user 2 times in the room, removing the old one");
+            // Utente connesso a 2 stanze diverse o 2 volte nella stessa stanza, può succedere ad es 2 tab aperte o 2 login allo stesso account da disp diversi
+            console.log("Same user 2 times in the socket list, removing the old one");
             same_user.leave(room_id);
+            same_user.disconnect();
         }
 
         socket.emit("id", user.id);
