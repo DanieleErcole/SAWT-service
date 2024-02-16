@@ -118,6 +118,9 @@ io.on("connection", (socket) => {
     socket.on("disconnect", async () => {
         let user = socket.data.user;
         let room_id = user.room_id;
+        socket.leave(room_id);
+        if((await io.fetchSockets()).find(s => s.id !== socket.id && s.data.user.id === user.id)) return;
+
         console.log(`User disconnected from room ${room_id}`);
         socket.data.user = null;
 
