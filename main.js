@@ -49,6 +49,11 @@ async function check_leader_inconsistency(io, room_id) {
     return await get_leader(io, room_id);
 }
 
+async function get_duplicated_user(socket, user) {
+    let sockets = await io.fetchSockets();
+    return sockets.find(s => s.id !== socket.id && s.data.user.id === user.id); // Prendo il più "vecchio"
+}
+
 // Authentication middleware
 // Controlla se l'utente è autenticato salvandolo nel socket, se si è appena connesso lo cerca nel db e lo salva nel campo data del socket
 io.use(async (socket, next) => {
@@ -78,8 +83,7 @@ io.on("connection", (socket) => {
         console.log(`User joined in room ${room_id}`);
         socket.join(room_id);
 
-        let sockets = await io.fetchSockets();
-        let same_user = sockets.find(s => s.id !== socket.id && s.data.user.id === user.id); // Prendo il più "vecchio"
+        let same_user = await get_duplicated_user(socket, user);
         if(same_user) {
             // Utente connesso a 2 stanze diverse o 2 volte nella stessa stanza, può succedere ad es 2 tab aperte o 2 login allo stesso account da disp diversi
             console.log("Same user 2 times in the socket list, removing the old one");
@@ -119,7 +123,7 @@ io.on("connection", (socket) => {
         let user = socket.data.user;
         let room_id = user.room_id;
         socket.leave(room_id);
-        if((await io.fetchSockets()).find(s => s.id !== socket.id && s.data.user.id === user.id)) return;
+        if(await get_duplicated_user(socket, user)) return;
 
         console.log(`User disconnected from room ${room_id}`);
         socket.data.user = null;
@@ -231,6 +235,7 @@ io.on("connection", (socket) => {
         let room_id = socket.data.user.room_id;
         if(!socket.data.user.is_leader) {
             let leader = await get_leader(io, room_id);
+            if(!leader) return;
             leader.once("video_state", (pos, paused) => {
                 if(paused) socket.emit("pause", pos);
             });
@@ -244,6 +249,7 @@ io.on("connection", (socket) => {
         let room_id = socket.data.user.room_id;
         if(!socket.data.user.is_leader) {
             let leader = await get_leader(io, room_id);
+            if(!leader) return;
             leader.once("video_state", (pos, paused) => {
                 if(!paused) socket.emit("resume", pos);
             });
@@ -257,6 +263,7 @@ io.on("connection", (socket) => {
         let room_id = socket.data.user.room_id;
         if(!socket.data.user.is_leader) {
             let leader = await get_leader(io, room_id);
+            if(!leader) return;
             leader.once("video_state", (pos, _) => {
                 if(pos != position) socket.emit("seek", pos);
             });
@@ -309,7 +316,6 @@ io.on("connection", (socket) => {
             return;
         }
 
-        //TODO: forse controllare che l'utente sia effettivamente nella stanza
         let user_to_kick = await user_by_id(io, id);
         if(!user_to_kick) {
             socket.emit("error", {message: "User not found"});
