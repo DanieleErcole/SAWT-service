@@ -37,7 +37,7 @@ const io = new Server(server, {
     }
 });
 
-// Controlla che lo stato del leader in una stanza sia consistente fra db e socket, può succedere ad esempio quando si aggiorna la pagina prima di connettersi al servizio
+// Controlla che lo stato del leader in una stanza sia inconsistente fra db e socket, può succedere ad esempio quando si aggiorna la pagina prima di connettersi al servizio
 async function check_leader_inconsistency(io, room_id) {
     let id = await leader_id_from_db(room_id);
     if(!id) // Non c'è un leader nel db, assegno un leader a caso
@@ -87,7 +87,7 @@ io.on("connection", (socket) => {
         if(same_user) {
             // Utente connesso a 2 stanze diverse o 2 volte nella stessa stanza, può succedere ad es 2 tab aperte o 2 login allo stesso account da disp diversi
             console.log("Same user 2 times in the socket list, removing the old one");
-            same_user.leave(room_id);
+            same_user.leave(same_user.room_id);
             same_user.disconnect();
         }
 
@@ -106,6 +106,7 @@ io.on("connection", (socket) => {
             let leader = await get_leader(io, room_id);
             // Se è true Il leader c'è nel socket e sicuramente nel db (se non è nel db è uscito sicuro, quindi non ci sarà anche il socket), tutto ok
             if(!leader) {
+                console.log("Leader not found");
                 leader = await check_leader_inconsistency(io, room_id);
                 leader.emit("leader_assigned");
                 io.in(room_id).emit("update_user_list", await room_users(io, room_id));
