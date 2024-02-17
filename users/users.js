@@ -1,7 +1,9 @@
 import { query, get_conn } from "../db/db_connection.js";
 
-// NOTE: If something in the db fails, like the assigment of a new leader aftre the disconnection of the previous one, the user will be disconnected anyway,
-//      but the room will be left in an inconsistent state, with no leader. Handle the error, like notifying the users or disconnecting them
+// Se c'e' un errore lato DB, come l'assegnazione di un nuovo leader dopo la 
+// disconnessione del precedente, l'utente verrà comunque disconnesso, ma la
+// stanza rimarrà in uno stato inconsistente, senza leader
+// funzione check_leader_inconsistency(), main.js
 
 export async function disconnect_user(id) {
     try {
@@ -30,10 +32,6 @@ export async function get_user(token) {
 export async function user_by_id(io, id) {
     return (await io.fetchSockets()).find(s => s.data.user.id == id);
 }
-
-/*export async function room_sockets(io, room_id) {
-    return await io.in(room_id).fetchSockets();
-}*/
 
 export async function room_users(io, room_id) {
     return (await io.in(room_id).fetchSockets()).map(s => {

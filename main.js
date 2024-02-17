@@ -92,8 +92,7 @@ io.on("connection", (socket) => {
         }
 
         socket.emit("id", user.id);
-        // Room previously empty
-        if(user.is_leader)
+        if(user.is_leader) // Primo utente nella stanza
             socket.emit("leader_assigned");
         io.in(room_id).emit("update_user_list", await room_users(io, room_id));
 
