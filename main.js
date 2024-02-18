@@ -100,23 +100,23 @@ io.on("connection", (socket) => {
         let videos = await get_room_videos(room_id);
         socket.emit("update_video_list", videos);
 
-        if(user.is_leader) // Primo utente, riproduco il video
+        if(user.is_leader) {
+            // Primo utente, riproduco il video
             socket.emit("play", 0);
-        else {
-            let leader = await get_leader(io, room_id);
-            // Se è true Il leader c'è nel socket e sicuramente nel db (se non è nel db è uscito sicuro, quindi non ci sarà anche il socket), tutto ok
-            if(!leader) {
-                console.log("Leader not found");
-                leader = await check_leader_inconsistency(io, room_id);
-                leader.emit("leader_assigned");
-                io.in(room_id).emit("update_user_list", await room_users(io, room_id));
-            }
-
-            leader.once("video_state", (position, _) => {
-                socket.emit("play", position);
-            });
-            leader.emit("state_request");
+            return;
         }
+        
+        let leader = await get_leader(io, room_id);
+        // Se è true Il leader c'è nel socket e sicuramente nel db (se non è nel db è uscito sicuro, quindi non ci sarà anche il socket), tutto ok
+        if(!leader) {
+            console.log("Leader not found");
+            leader = await check_leader_inconsistency(io, room_id);
+            leader.emit("leader_assigned");
+            io.in(room_id).emit("update_user_list", await room_users(io, room_id));
+        }
+
+        let resp = await leader.emitWithAck("state_request");
+        socket.emit("play", resp.pos);
     });
 
     socket.on("disconnect", async () => {
@@ -236,10 +236,9 @@ io.on("connection", (socket) => {
         if(!socket.data.user.is_leader) {
             let leader = await get_leader(io, room_id);
             if(!leader) return;
-            leader.once("video_state", (pos, paused) => {
-                if(paused) socket.emit("pause", pos);
-            });
-            leader.emit("state_request");
+
+            let resp = await leader.emitWithAck("state_request");
+            if(resp.paused) socket.emit("pause", resp.pos);
             return;
         }
         socket.broadcast.to(room_id).emit("resume", position);
@@ -250,10 +249,9 @@ io.on("connection", (socket) => {
         if(!socket.data.user.is_leader) {
             let leader = await get_leader(io, room_id);
             if(!leader) return;
-            leader.once("video_state", (pos, paused) => {
-                if(!paused) socket.emit("resume", pos);
-            });
-            leader.emit("state_request");
+
+            let resp = await leader.emitWithAck("state_request");
+            if(!resp.paused) socket.emit("resume", resp.pos);
             return;
         }
         socket.broadcast.to(room_id).emit("pause", position);
@@ -264,10 +262,9 @@ io.on("connection", (socket) => {
         if(!socket.data.user.is_leader) {
             let leader = await get_leader(io, room_id);
             if(!leader) return;
-            leader.once("video_state", (pos, _) => {
-                if(pos != position) socket.emit("seek", pos);
-            });
-            leader.emit("state_request");
+            
+            let resp = await leader.emitWithAck("state_request");
+            if(resp.pos != position) socket.emit("seek", resp.pos);
             return;
         }
         socket.broadcast.to(room_id).emit("seek", position);

@@ -51,7 +51,7 @@ export async function add_video(room_id, url, is_first) {
 
 export async function remove_video(room_id, id) {
     try {
-        await query(
+        let res = await query(
             'DELETE FROM video WHERE room_id = ? AND id = ?',
             [room_id, id]
         );
