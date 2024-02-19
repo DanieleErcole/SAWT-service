@@ -128,7 +128,7 @@ io.on("connection", (socket) => {
         console.log(`User disconnected from room ${room_id}`);
         socket.data.user = null;
 
-        await disconnect_user(user.id)
+        await disconnect_user(user.id);
 
         let room_usrs = await room_users(io, room_id);
         if(room_usrs.length == 0) return; // Stanza vuota, non faccio nulla
