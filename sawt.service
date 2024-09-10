@@ -1,0 +1,13 @@
+[Unit]
+Description=NodeJS service for SAWTogether
+
+[Service]
+User=sawlab
+Group=sawlab
+WordkingDirectory=/home/sawlab/SAWT-service/
+ExecStart=node ./main.js
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=user.target
